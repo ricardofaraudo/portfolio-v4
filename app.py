@@ -1172,8 +1172,6 @@ function updateWBadge(){
 }
 
 // ─── HOLDINGS CRUD ────────────────────────────────────────────────────────────
-function tog(id){const e=document.getElementById(id);e.style.display=e.style.display==="none"?"block":"none";}
-
 async function addH(){
   const ti=document.getElementById("nti").value.toUpperCase().trim();
   const sh=parseFloat(document.getElementById("nsh").value);
