@@ -941,22 +941,38 @@ function renderSCards(){
 // ─── DASHBOARD TABLE ──────────────────────────────────────────────────────────
 function renderDash(){
   const st=ps(); const btcP=getBtcPrice();
-  document.getElementById("dtb").innerHTML=S.h.map(h=>{
+  // Consolidate holdings by ticker (combine MMG + BG positions of same stock)
+  const grouped = {};
+  S.h.forEach(h=>{
+    if(!grouped[h.ticker]){
+      grouped[h.ticker] = {ticker:h.ticker,type:h.type,shares:0,total_cost:0,accounts:[],notes:h.notes,signal:h.signal};
+    }
+    grouped[h.ticker].shares += h.shares;
+    grouped[h.ticker].total_cost += h.avg_cost * h.shares;
+    if(h.account && !grouped[h.ticker].accounts.includes(h.account)){
+      grouped[h.ticker].accounts.push(h.account);
+    }
+  });
+  const consolidated = Object.values(grouped).map(g=>({
+    ...g,
+    avg_cost: g.shares ? g.total_cost/g.shares : 0,
+    account: g.accounts.join("+")
+  }));
+
+  document.getElementById("dtb").innerHTML=consolidated.map(h=>{
     const q=gq(h.ticker),f=gf(h.ticker),val=q.price*h.shares,pl=(q.price-h.avg_cost)*h.shares,plp=h.avg_cost?(q.price-h.avg_cost)/h.avg_cost*100:0;
     const sig=h.signal||{signal:"HOLD"};
-    // BTC ratio calculations
     const sharesPerBtcNow = btcP && q.price ? (btcP/q.price).toFixed(2) : "—";
     const sharesPerBtcBuy = btcP && h.avg_cost ? (btcP/h.avg_cost).toFixed(2) : "—";
     const ratioDiff = (sharesPerBtcBuy && sharesPerBtcNow && sharesPerBtcBuy!=="—") ?
       ((sharesPerBtcBuy-sharesPerBtcNow)/sharesPerBtcBuy*100) : null;
-    // Negative ratioDiff = stock outperformed (fewer shares per BTC = stock got more expensive in BTC)
     const outperforms = ratioDiff !== null && ratioDiff < 0;
     const vsBtcCls = outperforms ? "pos" : ratioDiff > 0 ? "neg" : "";
     const vsBtcTxt = ratioDiff !== null ? `${outperforms?"▲":"▼"} ${Math.abs(ratioDiff).toFixed(1)}%` : "—";
     const posValueBtc = btcP && q.price ? (val/btcP).toFixed(4) : "—";
 
     return`<tr>
-      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type}</div></td>
+      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type} <span style="color:var(--yw);">${h.account||""}</span> · ${h.shares.toLocaleString()} sh</div></td>
       <td style="color:var(--tx)">$${q.price.toFixed(2)}</td>
       <td class="${q.change_pct>=0?"pos":"neg"}">${q.change_pct>=0?"+":""}${q.change_pct.toFixed(2)}%</td>
       <td>${fmt$(val)}</td>
@@ -975,7 +991,14 @@ function renderDash(){
 // ─── ALLOCATION & MARGIN ─────────────────────────────────────────────────────
 function renderAlloc(){
   const st=ps();const cols=["#00d4ff","#00e676","#ffd740","#ff6d00","#ff3d57","#b388ff","#f7931a"];
-  document.getElementById("alloc").innerHTML=S.h.map((h,i)=>{
+  // Consolidate by ticker for allocation
+  const grouped = {};
+  S.h.forEach(h=>{
+    if(!grouped[h.ticker]) grouped[h.ticker] = {ticker:h.ticker,shares:0};
+    grouped[h.ticker].shares += h.shares;
+  });
+  const consolidated = Object.values(grouped);
+  document.getElementById("alloc").innerHTML=consolidated.map((h,i)=>{
     const q=gq(h.ticker),pct=st.tv?q.price*h.shares/st.tv*100:0;
     return`<div class="ai"><div class="at">${h.ticker}</div><div class="ab"><div class="af" style="width:${pct}%;background:${cols[i%cols.length]};"></div></div><div class="ap">${pct.toFixed(1)}%</div></div>`;
   }).join("");
@@ -992,10 +1015,17 @@ function renderMargin(){
 }
 
 function renderSigs(){
-  document.getElementById("sigs").innerHTML=S.h.map(h=>{
+  // Consolidate signals by ticker
+  const seen = new Set();
+  const consolidated = S.h.filter(h=>{
+    if(seen.has(h.ticker)) return false;
+    seen.add(h.ticker); return true;
+  });
+  document.getElementById("sigs").innerHTML=consolidated.map(h=>{
     const sig=h.signal||{signal:"HOLD",reasons:[]};
+    const accounts = [...new Set(S.h.filter(x=>x.ticker===h.ticker).map(x=>x.account||""))].filter(Boolean).join("+");
     return`<div class="pn" style="flex:1;min-width:190px;max-width:260px;">
-      <div class="ph"><div class="pt">${h.ticker} <span style="color:var(--yw);font-size:9px;">${h.account||""}</span></div><span class="sg ${sgc(sig.signal)}">${sig.signal}</span></div>
+      <div class="ph"><div class="pt">${h.ticker} <span style="color:var(--yw);font-size:9px;">${accounts}</span></div><span class="sg ${sgc(sig.signal)}">${sig.signal}</span></div>
       <div class="pb" style="padding:10px 14px;"><div style="font-size:11px;color:var(--t3);line-height:1.7;">${(sig.reasons||[]).map(r=>`• ${r}`).join("<br>")}</div></div>
     </div>`;
   }).join("");
@@ -1121,14 +1151,30 @@ function renderBtcTab(){
   document.getElementById('inp_cold').value = btcHold.cold;
   document.getElementById('inp_binance').value = btcHold.binance;
 
-  // Stocks vs BTC table
-  document.getElementById('btcRatioTb').innerHTML = S.h.map(h=>{
+  // Stocks vs BTC table — consolidated by ticker
+  const grouped = {};
+  S.h.forEach(h=>{
+    if(!grouped[h.ticker]){
+      grouped[h.ticker] = {ticker:h.ticker,type:h.type,shares:0,total_cost:0,accounts:[]};
+    }
+    grouped[h.ticker].shares += h.shares;
+    grouped[h.ticker].total_cost += h.avg_cost * h.shares;
+    if(h.account && !grouped[h.ticker].accounts.includes(h.account)){
+      grouped[h.ticker].accounts.push(h.account);
+    }
+  });
+  const consolidatedBtc = Object.values(grouped).map(g=>({
+    ...g,
+    avg_cost: g.shares ? g.total_cost/g.shares : 0,
+    account: g.accounts.join("+")
+  }));
+
+  document.getElementById('btcRatioTb').innerHTML = consolidatedBtc.map(h=>{
     const q = gq(h.ticker);
     const price = q.price;
     if(!price || !btcP) return '';
     const sharesPerBtcNow = btcP/price;
     const sharesPerBtcBuy = btcP/h.avg_cost;
-    // ratioDiff: if stock went up more than BTC, fewer shares per BTC now (negative diff = outperformed)
     const ratioDiff = (sharesPerBtcBuy-sharesPerBtcNow)/sharesPerBtcBuy*100;
     const stockRet = (price-h.avg_cost)/h.avg_cost*100;
     const posValueBtc = (price*h.shares)/btcP;
@@ -1137,7 +1183,7 @@ function renderBtcTab(){
     const verdictTxt = outperforms?"▲ OUTPERFORMING":"▼ UNDERPERFORMING";
 
     return`<tr>
-      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type}</div></td>
+      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type} · ${h.shares.toLocaleString()} sh</div></td>
       <td style="color:var(--yw);font-size:10px;">${h.account||"—"}</td>
       <td style="color:var(--btc)">${sharesPerBtcNow.toFixed(2)} shares/BTC</td>
       <td style="color:var(--t2)">${sharesPerBtcBuy.toFixed(2)} shares/BTC</td>
