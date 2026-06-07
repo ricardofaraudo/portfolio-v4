@@ -316,16 +316,27 @@ class UpdateHolding(BaseModel):
     shares: float; avg_cost: float; notes: str=""; account: str="MMG"
 
 @app.get("/api/quotes")
-async def api_quotes():
+async def api_quotes(extra: str = ""):
     hs=holdings(); wl=watchlist()
     tickers=list(set([h["ticker"] for h in hs]+[w["ticker"] for w in wl]+["BTC"]))
+    if extra:
+        for t in extra.split(","):
+            t = t.strip().upper()
+            if t and t not in tickers:
+                tickers.append(t)
     return await get_all_quotes(tickers)
 
 @app.get("/api/historical")
 async def api_historical():
     hs=holdings()
-    results=await asyncio.gather(*[get_historical(h["ticker"]) for h in hs],return_exceptions=True)
-    return {hs[i]["ticker"]:r for i,r in enumerate(results) if not isinstance(r,Exception)}
+    tickers = list(set([h["ticker"] for h in hs])) + ["BTC-USD"]
+    results=await asyncio.gather(*[get_historical(t) for t in tickers],return_exceptions=True)
+    out = {}
+    for i,t in enumerate(tickers):
+        if not isinstance(results[i],Exception):
+            key = "BTC" if t=="BTC-USD" else t
+            out[key] = results[i]
+    return out
 
 @app.get("/api/snapshot")
 async def api_snapshot():
@@ -569,8 +580,7 @@ tr:hover td{background:rgba(0,212,255,0.025);}
       <div class="sh"><div class="st"><span>//</span>POSITIONS</div></div>
       <div class="tw"><div class="ts"><table>
         <thead><tr>
-          <th>TICKER</th><th>PRICE</th><th>DAY%</th><th>VALUE</th><th>P&L</th>
-          <th>SHARES/BTC</th><th>VS BTC</th><th>BTC VALUE</th>
+          <th>TICKER</th><th>PRICE USD</th><th>SATS/SHARE</th><th>DAY%</th><th>VALUE</th><th>P&L</th>
           <th>P/E</th><th>P/S</th><th>PEG</th><th>DILUTION</th><th>SIGNAL</th>
         </tr></thead>
         <tbody id="dtb"></tbody>
@@ -594,7 +604,7 @@ tr:hover td{background:rgba(0,212,255,0.025);}
   <div class="pg" id="pcards"></div>
   <div class="sh"><div class="st"><span>//</span>RETURNS BY POSITION</div></div>
   <div class="tw"><div class="ts"><table>
-    <thead><tr><th>TICKER</th><th>ACCT</th><th>SECTOR</th><th>PRICE</th><th>AVG COST</th><th>DAY%</th><th>MTD%</th><th>3M%</th><th>YTD%</th><th>TOTAL%</th><th>TOTAL$</th></tr></thead>
+    <thead><tr><th>TICKER</th><th>ACCT</th><th>DAY% USD</th><th>DAY% SATS</th><th>MTD% SATS</th><th>3M% SATS</th><th>YTD% SATS</th><th>TOTAL% USD</th></tr></thead>
     <tbody id="ptb"></tbody>
   </table></div></div>
 </div>
@@ -696,17 +706,49 @@ tr:hover td{background:rgba(0,212,255,0.025);}
     </div>
   </div>
 
+  <!-- BINANCE WALLET -->
+  <div class="sh">
+    <div class="st"><span style="color:var(--btc);">₿</span> BINANCE WALLET — BTC ACCUMULATION ACCOUNT</div>
+    <button class="btn" onclick="tog('bnbAddForm')">+ ADD POSITION</button>
+  </div>
+
+  <!-- Add binance position form -->
+  <div id="bnbAddForm" style="display:none;margin-bottom:16px;">
+    <div class="pn"><div class="ph"><div class="pt">NEW BINANCE POSITION</div></div><div class="pb">
+      <div class="fr">
+        <input class="inp" id="bnbTi" placeholder="TICKER" style="max-width:90px;text-transform:uppercase">
+        <input class="inp" id="bnbSh" placeholder="SHARES" type="number" step="0.0001" style="max-width:110px">
+        <input class="inp" id="bnbCo" placeholder="AVG COST $" type="number" step="0.01" style="max-width:130px">
+        <input class="inp" id="bnbNo" placeholder="Notes" style="flex:2;min-width:180px">
+        <button class="btp" onclick="addBnbPos()">ADD</button>
+        <button class="btn" onclick="tog('bnbAddForm')" style="color:var(--t3)">CANCEL</button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- Binance wallet summary -->
+  <div class="pn" style="margin-bottom:16px;"><div class="pb">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;" id="bnbSummary"></div>
+  </div></div>
+
+  <!-- Binance positions table -->
+  <div class="tw" style="margin-bottom:24px;"><div class="ts"><table>
+    <thead><tr>
+      <th>TICKER</th><th>SHARES</th><th>AVG COST</th><th>PRICE</th><th>VALUE $</th>
+      <th>VALUE BTC</th><th>P&L</th><th>VS BTC TODAY</th><th>NOTES</th><th>ACTIONS</th>
+    </tr></thead>
+    <tbody id="bnbTb"></tbody>
+  </table></div></div>
+
   <!-- Stock vs BTC table -->
-  <div class="sh"><div class="st"><span style="color:var(--btc);">₿</span> STOCKS vs BITCOIN</div></div>
+  <div class="sh"><div class="st"><span style="color:var(--btc);">₿</span> STOCKS vs BITCOIN (MAIN PORTFOLIO)</div></div>
   <div class="tw"><div class="ts"><table>
     <thead><tr>
       <th>TICKER</th><th>ACCT</th>
-      <th>SHARES/BTC TODAY</th>
-      <th>SHARES/BTC AT PURCHASE</th>
-      <th>RATIO CHANGE %</th>
-      <th>STOCK RETURN %</th>
+      <th>SATS/SHARE</th>
+      <th>DAY% SATS</th>
       <th>POSITION (BTC)</th>
-      <th>VS BTC VERDICT</th>
+      <th>VERDICT TODAY</th>
     </tr></thead>
     <tbody id="btcRatioTb"></tbody>
   </table></div></div>
@@ -808,6 +850,7 @@ tr:hover td{background:rgba(0,212,255,0.025);}
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const SATS_PER_MSTR = 219900;
 const BTC_KEY = 'pf_btc_v4';
+const BNB_POS_KEY = 'pf_binance_positions_v4';
 const F = {
   MSTR:{pe:null,ps:22,peg:null,dilution:"~32%/yr",sector:"Bitcoin Treasury"},
   AMZN:{pe:38,ps:3.5,peg:1.8,dilution:"~1.4%/yr",sector:"E-Commerce/Cloud"},
@@ -822,6 +865,9 @@ const F = {
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let S = {h:[],w:[],q:{},hist:{},sel:null};
 let btcHold = JSON.parse(localStorage.getItem(BTC_KEY) || '{"cold":6.0,"binance":0.477}');
+let binancePos = JSON.parse(localStorage.getItem(BNB_POS_KEY) || JSON.stringify([
+  {id:1, ticker:"AMZN", shares:76, avg_cost:270.61, notes:"AMZNon tokenized — for BTC accumulation"}
+]));
 let chatHistory = [];
 let chatOpen = false;
 
@@ -843,8 +889,18 @@ function getBtcPrice(){
 }
 
 function getMstrBtc(){
-  const total = S.h.filter(h=>h.ticker==='MSTR').reduce((sum,h)=>sum+h.shares,0);
-  return (total * SATS_PER_MSTR) / 100000000;
+  // MSTR BTC value at MARKET PRICE (if sold today, how much BTC could you buy)
+  const totalShares = S.h.filter(h=>h.ticker==='MSTR').reduce((sum,h)=>sum+h.shares,0);
+  const mstrPrice = S.q['MSTR']?.price || 0;
+  const btcPrice = getBtcPrice();
+  if(!mstrPrice || !btcPrice) return 0;
+  return (totalShares * mstrPrice) / btcPrice;
+}
+
+function getMstrNavBtc(){
+  // MSTR BTC at NAV (theoretical holding via sats per share)
+  const totalShares = S.h.filter(h=>h.ticker==='MSTR').reduce((sum,h)=>sum+h.shares,0);
+  return (totalShares * SATS_PER_MSTR) / 100000000;
 }
 
 function getTotalBtc(){ return btcHold.cold + btcHold.binance + getMstrBtc(); }
@@ -867,11 +923,77 @@ function saveBtcHoldings(){
   toast('BTC holdings saved ✓');
 }
 
+// ─── BINANCE POSITIONS ──────────────────────────────────────────────────────
+function saveBnbPos(){
+  localStorage.setItem(BNB_POS_KEY, JSON.stringify(binancePos));
+}
+
+async function addBnbPos(){
+  const ti = document.getElementById('bnbTi').value.toUpperCase().trim();
+  const sh = parseFloat(document.getElementById('bnbSh').value);
+  const co = parseFloat(document.getElementById('bnbCo').value);
+  const no = document.getElementById('bnbNo').value.trim();
+  if(!ti || !sh || !co){toast('Ticker, shares and cost required','err');return;}
+  const newId = Math.max(...binancePos.map(p=>p.id||0), 0) + 1;
+  binancePos.push({id:newId, ticker:ti, shares:sh, avg_cost:co, notes:no});
+  saveBnbPos();
+  // Ensure quotes for this ticker are loaded
+  try{
+    const newQ = await api('GET','/quotes');
+    S.q = {...S.q, ...newQ};
+  }catch(e){}
+  tog('bnbAddForm');
+  ['bnbTi','bnbSh','bnbCo','bnbNo'].forEach(id=>document.getElementById(id).value='');
+  renderBtcTab();
+  toast(`${ti} added to Binance wallet`);
+}
+
+function editBnbPos(id){
+  const p = binancePos.find(x=>x.id===id);
+  if(!p) return;
+  const tr = document.getElementById(`bnb_${id}`);
+  if(!tr) return;
+  tr.innerHTML = `
+    <td><span class="tb">${p.ticker}</span></td>
+    <td><input class="ied" id="bes_${id}" type="number" step="0.0001" value="${p.shares}" style="width:90px;"></td>
+    <td><input class="ied" id="bec_${id}" type="number" step="0.01" value="${p.avg_cost}" style="width:90px;"></td>
+    <td colspan="6"><input class="ied" id="ben_${id}" value="${p.notes||''}" style="width:100%;"></td>
+    <td><div style="display:flex;gap:4px;justify-content:flex-end;">
+      <button class="btg" onclick="saveBnbEdit(${id})">SAVE</button>
+      <button class="bts" onclick="renderBtcTab()">CANCEL</button>
+    </div></td>`;
+}
+
+function saveBnbEdit(id){
+  const p = binancePos.find(x=>x.id===id);
+  if(!p) return;
+  const shares = parseFloat(document.getElementById(`bes_${id}`).value);
+  const avg_cost = parseFloat(document.getElementById(`bec_${id}`).value);
+  const notes = document.getElementById(`ben_${id}`).value;
+  if(!shares || shares<=0){toast('Shares > 0','err');return;}
+  p.shares = shares; p.avg_cost = avg_cost; p.notes = notes;
+  saveBnbPos();
+  renderBtcTab();
+  toast(`${p.ticker} updated`);
+}
+
+function delBnbPos(id){
+  const p = binancePos.find(x=>x.id===id);
+  if(!p) return;
+  if(!confirm(`Remove ${p.ticker} from Binance wallet?`)) return;
+  binancePos = binancePos.filter(x=>x.id!==id);
+  saveBnbPos();
+  renderBtcTab();
+  toast(`${p.ticker} removed`);
+}
+
 // ─── LOAD ────────────────────────────────────────────────────────────────────
 async function loadAll(){
   document.getElementById('lu').textContent='REFRESHING...';
   try{
-    const[h,w,q,st]=await Promise.all([api('GET','/holdings'),api('GET','/watchlist'),api('GET','/quotes'),api('GET','/status')]);
+    const extraTickers = binancePos.map(p=>p.ticker).join(',');
+    const quotesUrl = '/quotes' + (extraTickers ? '?extra='+encodeURIComponent(extraTickers) : '');
+    const[h,w,q,st]=await Promise.all([api('GET','/holdings'),api('GET','/watchlist'),api('GET',quotesUrl),api('GET','/status')]);
     S.h=h; S.w=w; S.q=q;
     if(!S.sel&&h.length) S.sel=h[0].ticker;
     document.getElementById('lu').textContent='LIVE — '+new Date().toLocaleTimeString();
@@ -962,24 +1084,21 @@ function renderDash(){
   document.getElementById("dtb").innerHTML=consolidated.map(h=>{
     const q=gq(h.ticker),f=gf(h.ticker),val=q.price*h.shares,pl=(q.price-h.avg_cost)*h.shares,plp=h.avg_cost?(q.price-h.avg_cost)/h.avg_cost*100:0;
     const sig=h.signal||{signal:"HOLD"};
-    const sharesPerBtcNow = btcP && q.price ? (btcP/q.price).toFixed(2) : "—";
-    const sharesPerBtcBuy = btcP && h.avg_cost ? (btcP/h.avg_cost).toFixed(2) : "—";
-    const ratioDiff = (sharesPerBtcBuy && sharesPerBtcNow && sharesPerBtcBuy!=="—") ?
-      ((sharesPerBtcBuy-sharesPerBtcNow)/sharesPerBtcBuy*100) : null;
-    const outperforms = ratioDiff !== null && ratioDiff < 0;
-    const vsBtcCls = outperforms ? "pos" : ratioDiff > 0 ? "neg" : "";
-    const vsBtcTxt = ratioDiff !== null ? `${outperforms?"▲":"▼"} ${Math.abs(ratioDiff).toFixed(1)}%` : "—";
-    const posValueBtc = btcP && q.price ? (val/btcP).toFixed(4) : "—";
+    // Sats per share calculation: (stock USD / BTC USD) * 100,000,000
+    const satsPerShare = btcP && q.price ? Math.round((q.price/btcP)*100000000) : 0;
+    const satsFormatted = satsPerShare > 1000000
+      ? (satsPerShare/1000000).toFixed(2)+"M"
+      : satsPerShare > 1000
+        ? (satsPerShare/1000).toFixed(1)+"K"
+        : satsPerShare.toLocaleString();
 
     return`<tr>
       <td><div class="tb">${h.ticker}</div><div class="tt">${h.type} <span style="color:var(--yw);">${h.account||""}</span> · ${h.shares.toLocaleString()} sh</div></td>
       <td style="color:var(--tx)">$${q.price.toFixed(2)}</td>
+      <td style="color:var(--btc);font-family:'DM Mono',monospace;">${satsFormatted} sats</td>
       <td class="${q.change_pct>=0?"pos":"neg"}">${q.change_pct>=0?"+":""}${q.change_pct.toFixed(2)}%</td>
       <td>${fmt$(val)}</td>
       <td class="${pl>=0?"pos":"neg"}">${pl>=0?"+":""}${fmt$(pl)} (${plp.toFixed(1)}%)</td>
-      <td style="color:var(--btc);font-size:10px;">${sharesPerBtcNow}/BTC</td>
-      <td class="${vsBtcCls}" style="font-size:10px;">${vsBtcTxt}</td>
-      <td style="color:var(--btc);font-size:10px;">₿${posValueBtc}</td>
       <td>${f.pe||"—"}</td><td>${f.ps||"—"}</td>
       <td class="${f.peg&&f.peg<1?"pos":f.peg&&f.peg>2.5?"neg":""}">${f.peg||"—"}</td>
       <td style="color:${h.ticker==="MSTR"?"var(--rd)":h.ticker==="LLY"?"var(--gr)":"var(--t2)"}">${f.dilution||"—"}</td>
@@ -1044,19 +1163,69 @@ function renderPerfCards(){
 
 function renderPerfTable(){
   const hl=Object.keys(S.hist).length===0;
-  document.getElementById("ptb").innerHTML=S.h.map(h=>{
-    const q=gq(h.ticker),hist=S.hist[h.ticker]||{},f=gf(h.ticker),pl=(q.price-h.avg_cost)*h.shares,plp=h.avg_cost?(q.price-h.avg_cost)/h.avg_cost*100:0;
+  const btcQ = S.q['BTC']||{};
+  const btcHist = S.hist['BTC']||{};
+  const btcDay = btcQ.change_pct;
+
+  // Consolidate by ticker
+  const grouped = {};
+  S.h.forEach(h=>{
+    if(!grouped[h.ticker]){
+      grouped[h.ticker] = {ticker:h.ticker,type:h.type,shares:0,total_cost:0,accounts:[]};
+    }
+    grouped[h.ticker].shares += h.shares;
+    grouped[h.ticker].total_cost += h.avg_cost * h.shares;
+    if(h.account && !grouped[h.ticker].accounts.includes(h.account)){
+      grouped[h.ticker].accounts.push(h.account);
+    }
+  });
+  const consolidated = Object.values(grouped).map(g=>({
+    ...g,
+    avg_cost: g.shares ? g.total_cost/g.shares : 0,
+    account: g.accounts.join("+")
+  }));
+
+  // % change in sats = stock_USD_change - BTC_USD_change
+  // (since sats_now/sats_then = (S1/B1)/(S0/B0), and small-change approximation
+  //  gives % change as difference of % changes)
+  const satsChg = (stockPct,btcPct)=>{
+    if(stockPct==null || btcPct==null) return null;
+    return stockPct - btcPct;
+  };
+  const renderPct = (v,l=false)=>{
+    if(l) return '<span style="color:var(--t3)">...</span>';
+    if(v==null) return '<span style="color:var(--t3)">—</span>';
+    return `<span class="${v>=0?"pos":"neg"}">${v>=0?"+":""}${v.toFixed(2)}%</span>`;
+  };
+
+  document.getElementById("ptb").innerHTML=consolidated.map(h=>{
+    const q=gq(h.ticker),hist=S.hist[h.ticker]||{},plp=h.avg_cost?(q.price-h.avg_cost)/h.avg_cost*100:0;
+    const daySats = satsChg(q.change_pct,btcDay);
+    const mtdSats = satsChg(hist.mtd,btcHist.mtd);
+    const m3Sats = satsChg(hist.m3,btcHist.m3);
+    const ytdSats = satsChg(hist.ytd,btcHist.ytd);
     return`<tr>
-      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type}</div></td>
+      <td><div class="tb">${h.ticker}</div><div class="tt">${h.type} · ${h.shares.toLocaleString()} sh</div></td>
       <td style="color:var(--yw);text-align:left;font-size:10px;">${h.account||"—"}</td>
-      <td style="color:var(--t2);text-align:left">${f.sector||"—"}</td>
-      <td>$${q.price.toFixed(2)}</td><td style="color:var(--t2)">$${h.avg_cost.toFixed(2)}</td>
       <td class="${q.change_pct>=0?"pos":"neg"}">${q.change_pct>=0?"+":""}${q.change_pct.toFixed(2)}%</td>
-      <td>${fmtP(hist.mtd,hl)}</td><td>${fmtP(hist.m3,hl)}</td><td>${fmtP(hist.ytd,hl)}</td>
+      <td>${renderPct(daySats)}</td>
+      <td>${renderPct(mtdSats,hl)}</td>
+      <td>${renderPct(m3Sats,hl)}</td>
+      <td>${renderPct(ytdSats,hl)}</td>
       <td class="${plp>=0?"pos":"neg"}">${plp>=0?"+":""}${plp.toFixed(2)}%</td>
-      <td class="${pl>=0?"pos":"neg"}">${pl>=0?"+":""}${fmt$(pl)}</td>
     </tr>`;
   }).join("");
+
+  // BTC reference row
+  if(!hl && btcQ.price){
+    document.getElementById("ptb").innerHTML += `<tr style="background:rgba(247,147,26,0.05);">
+      <td><div class="tb" style="color:var(--btc);">₿ BTC</div><div class="tt">$${btcQ.price.toLocaleString('en-US',{maximumFractionDigits:0})}</div></td>
+      <td style="color:var(--btc);font-size:10px;">BENCHMARK</td>
+      <td class="${btcDay>=0?"pos":"neg"}">${btcDay>=0?"+":""}${btcDay?btcDay.toFixed(2):"—"}%</td>
+      <td colspan="4" style="text-align:center;color:var(--t3);font-style:italic;font-size:10px;">— BTC sats vs BTC sats = 0% always —</td>
+      <td>${renderPct(btcHist.ytd,hl)}</td>
+    </tr>`;
+  }
 }
 
 // ─── HOLDINGS TABLE ──────────────────────────────────────────────────────────
@@ -1129,10 +1298,17 @@ function renderBtcTab(){
   }
 
   // Stack breakdown
+  const totalMstrShares = S.h.filter(h=>h.ticker==="MSTR").reduce((s,h)=>s+h.shares,0);
+  const mstrPrice = S.q['MSTR']?.price || 0;
+  const marketSatsPerShare = btcP ? Math.round((mstrPrice/btcP)*100000000) : 0;
+  const navSatsPerShare = SATS_PER_MSTR; // 219,900
+  const satsDiscount = marketSatsPerShare && navSatsPerShare ? ((marketSatsPerShare - navSatsPerShare)/navSatsPerShare*100) : 0;
+  const mstrNote = `${totalMstrShares} sh × $${mstrPrice.toFixed(2)} = ${marketSatsPerShare.toLocaleString()} mkt sats vs ${navSatsPerShare.toLocaleString()} NAV sats (${satsDiscount>=0?"+":""}${satsDiscount.toFixed(1)}%)`;
+
   const stackItems = [
     {label:"COLD STORAGE",btc:btcHold.cold,color:"#f7931a",note:"Long-term hold"},
     {label:"BINANCE WALLET",btc:btcHold.binance,color:"#ffb84d",note:"Active trading"},
-    {label:"MSTR EQUIVALENT",btc:mstrBtc,color:"#00d4ff",note:`${S.h.filter(h=>h.ticker==="MSTR").reduce((s,h)=>s+h.shares,0)} shares × 219,900 sats`},
+    {label:"MSTR (MARKET VALUE)",btc:mstrBtc,color:"#00d4ff",note:mstrNote},
   ];
   document.getElementById('btcStackBreak').innerHTML = stackItems.map(item=>`
     <div style="margin-bottom:16px;">
@@ -1169,28 +1345,117 @@ function renderBtcTab(){
     account: g.accounts.join("+")
   }));
 
+  const btcDayChg = S.q['BTC']?.change_pct || 0;
   document.getElementById('btcRatioTb').innerHTML = consolidatedBtc.map(h=>{
     const q = gq(h.ticker);
     const price = q.price;
     if(!price || !btcP) return '';
-    const sharesPerBtcNow = btcP/price;
-    const sharesPerBtcBuy = btcP/h.avg_cost;
-    const ratioDiff = (sharesPerBtcBuy-sharesPerBtcNow)/sharesPerBtcBuy*100;
-    const stockRet = (price-h.avg_cost)/h.avg_cost*100;
+    // Sats per share = (stock USD / BTC USD) * 100M
+    const satsNow = Math.round((price/btcP)*100000000);
+    // Day% in sats = stock day% - BTC day%
+    const daySatsPct = (q.change_pct||0) - btcDayChg;
     const posValueBtc = (price*h.shares)/btcP;
-    const outperforms = ratioDiff < 0;
-    const verdictCls = outperforms?"sg-a":"sg-t";
-    const verdictTxt = outperforms?"▲ OUTPERFORMING":"▼ UNDERPERFORMING";
+    const fmt = n => n>1000000?(n/1000000).toFixed(2)+"M":n>1000?(n/1000).toFixed(1)+"K":n.toLocaleString();
+    const gainedSats = daySatsPct >= 0;
+    const verdictCls = gainedSats?"sg-a":"sg-t";
+    const verdictTxt = gainedSats?"▲ GAINING SATS":"▼ LOSING SATS";
 
     return`<tr>
       <td><div class="tb">${h.ticker}</div><div class="tt">${h.type} · ${h.shares.toLocaleString()} sh</div></td>
       <td style="color:var(--yw);font-size:10px;">${h.account||"—"}</td>
-      <td style="color:var(--btc)">${sharesPerBtcNow.toFixed(2)} shares/BTC</td>
-      <td style="color:var(--t2)">${sharesPerBtcBuy.toFixed(2)} shares/BTC</td>
-      <td class="${ratioDiff<0?"pos":"neg"}">${ratioDiff>=0?"+":""}${ratioDiff.toFixed(2)}%</td>
-      <td class="${stockRet>=0?"pos":"neg"}">${stockRet>=0?"+":""}${stockRet.toFixed(2)}%</td>
+      <td style="color:var(--btc)">${fmt(satsNow)} sats</td>
+      <td class="${gainedSats?"pos":"neg"}">${daySatsPct>=0?"+":""}${daySatsPct.toFixed(2)}%</td>
       <td style="color:var(--btc)">₿ ${posValueBtc.toFixed(4)}</td>
       <td><span class="sg ${verdictCls}">${verdictTxt}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Render Binance wallet section
+  renderBinanceWallet();
+}
+
+// ─── BINANCE WALLET RENDER ──────────────────────────────────────────────────
+function renderBinanceWallet(){
+  const btcP = getBtcPrice();
+  const btcDayChg = S.q['BTC']?.change_pct || 0;
+
+  // Compute totals
+  let totalValue = btcHold.binance * btcP;  // BTC portion
+  let totalCost = 0;
+  let positionsValue = 0;
+  binancePos.forEach(p=>{
+    const q = S.q[p.ticker] || {price:p.avg_cost,change_pct:0};
+    const val = q.price * p.shares;
+    positionsValue += val;
+    totalValue += val;
+    totalCost += p.avg_cost * p.shares;
+  });
+  totalCost += btcHold.binance * btcP; // BTC bought at current price (treated as 0 PnL for BTC portion)
+  const totalBtcEquiv = btcP ? totalValue / btcP : 0;
+
+  // Today's weighted % change vs BTC
+  let weightedStockChg = 0;
+  let totalPosValue = 0;
+  binancePos.forEach(p=>{
+    const q = S.q[p.ticker] || {price:p.avg_cost,change_pct:0};
+    const val = q.price * p.shares;
+    if(val > 0){
+      weightedStockChg += (q.change_pct||0) * val;
+      totalPosValue += val;
+    }
+  });
+  const avgStockChg = totalPosValue > 0 ? weightedStockChg / totalPosValue : 0;
+  const wsDayVsBtc = avgStockChg - btcDayChg;
+
+  // Summary cards
+  document.getElementById('bnbSummary').innerHTML = `
+    <div style="text-align:center;padding:12px;background:var(--s2);border-radius:8px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:1px;">TOTAL VALUE</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;color:var(--tx);margin-top:4px;">$${totalValue.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--btc);margin-top:2px;">₿ ${totalBtcEquiv.toFixed(4)}</div>
+    </div>
+    <div style="text-align:center;padding:12px;background:var(--s2);border-radius:8px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:1px;">BTC HOLDING</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;color:var(--btc);margin-top:4px;">${btcHold.binance.toFixed(4)} BTC</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-top:2px;">$${(btcHold.binance*btcP).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+    </div>
+    <div style="text-align:center;padding:12px;background:var(--s2);border-radius:8px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:1px;">STOCKS VALUE</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;color:var(--ac);margin-top:4px;">$${positionsValue.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-top:2px;">${binancePos.length} position${binancePos.length===1?'':'s'}</div>
+    </div>
+    <div style="text-align:center;padding:12px;background:var(--s2);border-radius:8px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--t3);letter-spacing:1px;">STOCKS vs BTC TODAY</div>
+      <div style="font-family:'DM Mono',monospace;font-size:18px;margin-top:4px;" class="${wsDayVsBtc>=0?'pos':'neg'}">${wsDayVsBtc>=0?'+':''}${wsDayVsBtc.toFixed(2)}%</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--t3);margin-top:2px;">${wsDayVsBtc>=0?'GAINING':'LOSING'} SATS</div>
+    </div>`;
+
+  // Positions table
+  if(binancePos.length === 0){
+    document.getElementById('bnbTb').innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:24px;">No Binance positions yet. Click "+ ADD POSITION" above.</td></tr>`;
+    return;
+  }
+  document.getElementById('bnbTb').innerHTML = binancePos.map(p=>{
+    const q = S.q[p.ticker] || {price:p.avg_cost,change_pct:0};
+    const val = q.price * p.shares;
+    const pl = (q.price - p.avg_cost) * p.shares;
+    const plp = p.avg_cost ? (q.price - p.avg_cost)/p.avg_cost*100 : 0;
+    const valBtc = btcP ? val/btcP : 0;
+    const dayVsBtc = (q.change_pct||0) - btcDayChg;
+    return `<tr id="bnb_${p.id}">
+      <td><div class="tb">${p.ticker}</div></td>
+      <td>${p.shares.toLocaleString()}</td>
+      <td>$${p.avg_cost.toFixed(2)}</td>
+      <td>$${q.price.toFixed(2)}</td>
+      <td>$${val.toLocaleString('en-US',{maximumFractionDigits:0})}</td>
+      <td style="color:var(--btc)">₿ ${valBtc.toFixed(4)}</td>
+      <td class="${pl>=0?'pos':'neg'}">${pl>=0?'+':''}$${Math.abs(pl).toLocaleString('en-US',{maximumFractionDigits:0})} (${plp.toFixed(1)}%)</td>
+      <td class="${dayVsBtc>=0?'pos':'neg'}">${dayVsBtc>=0?'+':''}${dayVsBtc.toFixed(2)}%</td>
+      <td style="color:var(--t3);font-size:10px;max-width:140px;white-space:normal;text-align:left;">${p.notes||'—'}</td>
+      <td><div style="display:flex;gap:4px;justify-content:flex-end;">
+        <button class="bts" onclick="editBnbPos(${p.id})">EDIT</button>
+        <button class="bts btd" onclick="delBnbPos(${p.id})">DEL</button>
+      </div></td>
     </tr>`;
   }).join('');
 }
