@@ -604,7 +604,7 @@ tr:hover td{background:rgba(0,212,255,0.025);}
   <div class="pg" id="pcards"></div>
   <div class="sh"><div class="st"><span>//</span>RETURNS BY POSITION</div></div>
   <div class="tw"><div class="ts"><table>
-    <thead><tr><th>TICKER</th><th>ACCT</th><th>DAY% USD</th><th>DAY% SATS</th><th>MTD% SATS</th><th>3M% SATS</th><th>YTD% SATS</th><th>TOTAL% USD</th></tr></thead>
+    <thead><tr><th>TICKER</th><th>ACCT</th><th>DAY% USD</th><th>DAY% SATS</th><th>MTD% USD</th><th>MTD% SATS</th><th>3M% USD</th><th>3M% SATS</th><th>YTD% USD</th><th>YTD% SATS</th><th>TOTAL% USD</th></tr></thead>
     <tbody id="ptb"></tbody>
   </table></div></div>
 </div>
@@ -903,7 +903,16 @@ function getMstrNavBtc(){
   return (totalShares * SATS_PER_MSTR) / 100000000;
 }
 
-function getTotalBtc(){ return btcHold.cold + btcHold.binance + getMstrBtc(); }
+function getBinancePosBtc(){
+  const btcP = getBtcPrice();
+  if(!btcP) return 0;
+  return binancePos.reduce((sum, p)=>{
+    const q = S.q[p.ticker] || {price: p.avg_cost};
+    return sum + (q.price * p.shares) / btcP;
+  }, 0);
+}
+
+function getTotalBtc(){ return btcHold.cold + btcHold.binance + getMstrBtc() + getBinancePosBtc(); }
 
 function getMnav(){
   const btcP = getBtcPrice();
@@ -1209,8 +1218,11 @@ function renderPerfTable(){
       <td style="color:var(--yw);text-align:left;font-size:10px;">${h.account||"—"}</td>
       <td class="${q.change_pct>=0?"pos":"neg"}">${q.change_pct>=0?"+":""}${q.change_pct.toFixed(2)}%</td>
       <td>${renderPct(daySats)}</td>
+      <td>${renderPct(hist.mtd,hl)}</td>
       <td>${renderPct(mtdSats,hl)}</td>
+      <td>${renderPct(hist.m3,hl)}</td>
       <td>${renderPct(m3Sats,hl)}</td>
+      <td>${renderPct(hist.ytd,hl)}</td>
       <td>${renderPct(ytdSats,hl)}</td>
       <td class="${plp>=0?"pos":"neg"}">${plp>=0?"+":""}${plp.toFixed(2)}%</td>
     </tr>`;
@@ -1222,8 +1234,14 @@ function renderPerfTable(){
       <td><div class="tb" style="color:var(--btc);">₿ BTC</div><div class="tt">$${btcQ.price.toLocaleString('en-US',{maximumFractionDigits:0})}</div></td>
       <td style="color:var(--btc);font-size:10px;">BENCHMARK</td>
       <td class="${btcDay>=0?"pos":"neg"}">${btcDay>=0?"+":""}${btcDay?btcDay.toFixed(2):"—"}%</td>
-      <td colspan="4" style="text-align:center;color:var(--t3);font-style:italic;font-size:10px;">— BTC sats vs BTC sats = 0% always —</td>
+      <td style="color:var(--t3);text-align:center;font-style:italic;">—</td>
+      <td>${renderPct(btcHist.mtd,hl)}</td>
+      <td style="color:var(--t3);text-align:center;font-style:italic;">—</td>
+      <td>${renderPct(btcHist.m3,hl)}</td>
+      <td style="color:var(--t3);text-align:center;font-style:italic;">—</td>
       <td>${renderPct(btcHist.ytd,hl)}</td>
+      <td style="color:var(--t3);text-align:center;font-style:italic;">—</td>
+      <td style="color:var(--btc);font-size:10px;">BENCHMARK</td>
     </tr>`;
   }
 }
@@ -1305,9 +1323,19 @@ function renderBtcTab(){
   const satsDiscount = marketSatsPerShare && navSatsPerShare ? ((marketSatsPerShare - navSatsPerShare)/navSatsPerShare*100) : 0;
   const mstrNote = `${totalMstrShares} sh × $${mstrPrice.toFixed(2)} = ${marketSatsPerShare.toLocaleString()} mkt sats vs ${navSatsPerShare.toLocaleString()} NAV sats (${satsDiscount>=0?"+":""}${satsDiscount.toFixed(1)}%)`;
 
+  // Binance positions BTC equivalent
+  const bnbPosBtc = getBinancePosBtc();
+  const bnbPosNote = binancePos.length > 0
+    ? binancePos.map(p=>{
+        const q = S.q[p.ticker] || {price:p.avg_cost};
+        return `${p.shares} ${p.ticker} @ $${q.price.toFixed(2)}`;
+      }).join(' + ')
+    : "No positions";
+
   const stackItems = [
     {label:"COLD STORAGE",btc:btcHold.cold,color:"#f7931a",note:"Long-term hold"},
-    {label:"BINANCE WALLET",btc:btcHold.binance,color:"#ffb84d",note:"Active trading"},
+    {label:"BINANCE BTC",btc:btcHold.binance,color:"#ffb84d",note:"Active trading wallet"},
+    {label:"BINANCE STOCKS",btc:bnbPosBtc,color:"#ffd740",note:bnbPosNote},
     {label:"MSTR (MARKET VALUE)",btc:mstrBtc,color:"#00d4ff",note:mstrNote},
   ];
   document.getElementById('btcStackBreak').innerHTML = stackItems.map(item=>`
