@@ -207,7 +207,7 @@ async def call_claude(prompt,max_tokens=1024):
     if not key: raise ValueError("ANTHROPIC_API_KEY not set in Railway Variables")
     async with httpx.AsyncClient(timeout=60.0) as c:
         r=await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},
-                       json={"model":"claude-sonnet-4-20250514","max_tokens":max_tokens,"messages":[{"role":"user","content":prompt}]})
+                       json={"model":"claude-sonnet-4-6","max_tokens":max_tokens,"messages":[{"role":"user","content":prompt}]})
         r.raise_for_status()
         return "".join(b["text"] for b in r.json()["content"] if b["type"]=="text")
 
@@ -294,7 +294,7 @@ Answer questions about portfolio, positions, BTC accumulation strategy, market c
     if not key: raise ValueError("ANTHROPIC_API_KEY not set")
     async with httpx.AsyncClient(timeout=60.0) as c:
         r=await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},
-                       json={"model":"claude-sonnet-4-20250514","max_tokens":800,"system":system,"messages":messages})
+                       json={"model":"claude-sonnet-4-6","max_tokens":800,"system":system,"messages":messages})
         r.raise_for_status()
         return "".join(b["text"] for b in r.json()["content"] if b["type"]=="text")
 
