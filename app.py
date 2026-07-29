@@ -34,6 +34,7 @@ FUND = {
     "OSCR": {"pe":12,"ps":0.8,"peg":0.4,"dilution":"~4.6%/yr","growth":"+30%","sector":"Health Insurance","sats_per_share":0},
     "SOFI": {"pe":28,"ps":2.8,"peg":0.8,"dilution":"~13%/yr","growth":"+41%","sector":"Fintech","sats_per_share":0},
     "ZETA": {"pe":None,"ps":2.5,"peg":0.8,"dilution":"~3%/yr","growth":"+37%","sector":"AI Marketing Cloud","sats_per_share":0},
+    "ASTS": {"pe":None,"ps":120,"peg":None,"dilution":"~8%/yr (convert risk)","growth":"N/A — pre-revenue scale","sector":"Satellite/Defense","sats_per_share":0},
 }
 
 DEFAULT_PRICES = {
@@ -41,19 +42,23 @@ DEFAULT_PRICES = {
     "HIMS":{"price":28.78,"change_pct":0.0},  "LLY": {"price":1125.00,"change_pct":0.0},
     "OSCR":{"price":22.00,"change_pct":0.0},  "SOFI":{"price":16.20,"change_pct":0.0},
     "ZETA":{"price":18.00,"change_pct":0.0},  "BTC": {"price":61000.0,"change_pct":0.0},
+    "ASTS":{"price":66.00,"change_pct":0.0},
 }
 
 PORTFOLIO_CONTEXT = """
 INVESTOR: Ricardo Faraudo, founding partner DENFAB Law, Panama City.
-STRATEGY: Two-bucket system — (1) On-chain Bitcoin (cold storage + Binance trading) targeting 10 BTC, (2) Stock portfolio for compounding wealth.
-MSTR STRATEGY: Use mNAV cycles — buy MSTR when mNAV below 1x/1.3x, sell when mNAV above 2x, convert profits to BTC. Gradually exiting MSTR from brokerages.
-PORTFOLIO ARCHITECTURE: Compounders (AMZN, LLY) + High-beta convictions (HIMS) — no MSTR in BG account going forward.
-LLY: Retatrutide/TRIUMPH-1 confirmed. Multi-indication platform drug — obesity, T2D, osteoarthritis, sleep apnea, cardiovascular. Building to 10-15% via income DCA.
-HIMS: Healthcare subscription platform (Netflix of health). 3,400 shares. Eucalyptus closed June 2. Harvard peptide CMO hired. California peptide facility built. July FDA peptide catalyst. Q2 Aug 10. Trim only at $40 resistance.
-AMZN: Core compounder. Margin anchor in MMG. Leave alone.
-BTC GOAL: 10 BTC in cold storage. Currently ~6.5 BTC total. Using MSTR mNAV arbitrage to accumulate more BTC.
-ACCOUNTS: MMG Bank ($80K margin) + Banco General ($40K margin). BG = non-Bitcoin stocks only going forward.
-WATCHLIST: ZETA ($18, target $15-17), OSCR (target $17-19, complete healthcare trifecta), SOFI.
+STRATEGY: Two-bucket system — (1) On-chain Bitcoin (cold storage + Binance trading) targeting 10 BTC by 2028, (2) Stock portfolio for compounding wealth.
+IMPORTANT — DATE AWARENESS: A "Today's date" line is provided above in this prompt. Always reason relative to that actual date. Do not assume any FDA meeting, earnings date, or catalyst mentioned below is still upcoming — check whether it has already passed relative to today's date before describing it as a future event.
+MSTR STRATEGY: Use mNAV cycles — buy MSTR when mNAV below 1x/1.3x, sell when mNAV above 2x, convert profits to BTC. Gradually exiting MSTR from brokerages; accumulating tokenized MSTR on Binance (no leverage) specifically to convert to cold-storage BTC when mNAV re-rates in the next bull cycle (~2028 target).
+PORTFOLIO ARCHITECTURE: Compounders (AMZN, LLY) + High-beta convictions (HIMS) + small speculative satellite/defense position (ASTS) — no MSTR in BG account going forward.
+LLY: Retatrutide/TRIUMPH-1 confirmed. Multi-indication platform drug — obesity, T2D, osteoarthritis, sleep apnea, cardiovascular, oncology (Retevmo/Jaypirca EU approval), Medicare GLP-1 Bridge Program (from July 2026). THIS IS AN UNCAPPED CORE ANCHOR POSITION — Ricardo explicitly wants as much LLY as possible with NO allocation ceiling, even above 30% of portfolio. NEVER recommend trimming or selling LLY for portfolio-balance reasons. Add aggressively below $1,100; add on any weakness regardless of current %.
+HIMS: Healthcare subscription platform (Netflix of health). Eucalyptus international acquisition closed. Harvard peptide CMO hired. California peptide manufacturing facility built. FDA Pharmacy Compounding Advisory Committee (PCAC) met July 23-24, 2026 and voted favorably (6 of 7 peptides recommended for the 503A Bulks List, overriding FDA staff's own restrictive proposal) — this is a resolved, positive event, but actual legal compounding availability still requires FDA's final rulemaking, typically 8-12+ months out, so peptide revenue remains a 2027+ optionality story, not yet in current financials. Novo Nordisk has publicly stated it is "pleased" with the HIMS partnership. Q2 earnings Aug 10, 2026. Never add above $30-32 (avoid chasing breakouts); add meaningfully on pullbacks to $28-32, aggressively below $24-28; never sell unless $40 becomes confirmed resistance with rejection — even then only trim a small tactical portion, and proceeds stay within the Bitcoin/margin ecosystem (never redirected to fund OSCR/ZETA/other new positions).
+AMZN: Core compounder. Margin anchor in MMG, building toward 300 shares. Leave alone; add in value zones (~$230 or lower) or when funded by MSTR brokerage bounces.
+ASTS: Small (~100 share) speculative long-duration position in AST SpaceMobile — satellite direct-to-device + emerging government/defense (SHIELD/Golden Dome) optionality. Deliberately small sizing given pre-revenue-scale valuation, convertible-note dilution risk, and Aug earnings binary risk. 1-3 year thesis tied to satellite deployment; not a conviction-tier position — do not recommend adding significantly without fresh, explicitly-designated capital.
+BTC GOAL: 10 BTC in cold storage by 2028. Using MSTR mNAV arbitrage (in Binance, no leverage) to accumulate more BTC over time, especially during bear-market/low-mNAV periods — deliberately not chasing MSTR strength in bullish periods.
+ACCOUNTS: MMG Bank (~$80K margin) + Banco General (~$40K margin). BG = non-Bitcoin stocks only going forward (no MSTR in BG).
+WATCHLIST PRIORITIES (fresh capital only, never funded by trimming existing conviction positions): OSCR — target ~$23 (re-entry after prior $21 exit; thesis strengthened since — MLR improvement, Barclays upgrade); ZETA — target $15-17 or pre-earnings weakness (real cash flow, ~30-40% growth, OpenAI ad-revenue optionality not yet in most models); PLTR — only on a real pullback toward $105-115, not at stretched valuations; ELMT — molybdenum/space materials, target ~$42.
+CAPITAL PRIORITY WHEN FRESH MONEY IS AVAILABLE (in order): LLY (uncapped, always first priority especially below $1,100) > HIMS on genuine pullback to $28-32 or lower > AMZN in value zones > MSTR/Binance-BTC-conversion opportunistically at low mNAV > OSCR/ZETA/other watchlist names only with capital explicitly not needed elsewhere (e.g., after the household renovation budget is funded).
 """
 
 _store = {"holdings": None, "watchlist": None}
@@ -69,7 +74,8 @@ def get_holdings_data():
         {"id":3,"ticker":"HIMS","shares":2400,"avg_cost":30.44,"type":"high-beta","account":"MMG","notes":"Healthcare platform. 400 tactical shares trim at $40 resistance."},
         {"id":4,"ticker":"MSTR","shares":175,"avg_cost":250.00,"type":"high-beta","account":"BG","notes":"Selling for trip cash. Not replacing in BG."},
         {"id":5,"ticker":"HIMS","shares":1000,"avg_cost":30.44,"type":"high-beta","account":"BG","notes":"Healthcare platform position in BG."},
-        {"id":6,"ticker":"LLY","shares":50,"avg_cost":1010.00,"type":"compounder","account":"BG","notes":"Retatrutide thesis. Building to 10-15%. DCA 2-3 shares/month."},
+        {"id":6,"ticker":"LLY","shares":60,"avg_cost":1034.00,"type":"compounder","account":"BG","notes":"Retatrutide thesis. Uncapped core anchor — no allocation ceiling. Add aggressively below $1,100."},
+        {"id":7,"ticker":"ASTS","shares":100,"avg_cost":66.00,"type":"speculative","account":"MMG","notes":"Small long-duration satellite/defense bet. Not conviction-tier — deliberately small, no aggressive adds."},
     ]
 
 def get_watchlist_data():
@@ -78,10 +84,10 @@ def get_watchlist_data():
         try: return json.loads(raw)
         except: pass
     return [
-        {"id":1,"ticker":"OSCR","target_price":18.50,"notes":"Health insurance platform. Complete healthcare trifecta. Target $17-19."},
-        {"id":2,"ticker":"SOFI","target_price":14.00,"notes":"Fintech. 13%/yr dilution headwind. Watch carefully."},
-        {"id":3,"ticker":"ZETA","target_price":16.00,"notes":"AI Marketing Cloud. Target $15-17. Picks and shovels for digital advertising."},
+        {"id":1,"ticker":"OSCR","target_price":23.00,"notes":"Health insurance platform. Re-entry after prior $21 exit — thesis strengthened since (MLR improvement, Barclays upgrade). Complete healthcare trifecta with LLY/HIMS. Fresh capital only."},
+        {"id":3,"ticker":"ZETA","target_price":16.00,"notes":"AI Marketing Cloud. Target $15-17 or pre-earnings weakness. Real FCF, ~30-40% growth, OpenAI ad-revenue deal not yet in most models. Fresh capital only."},
         {"id":4,"ticker":"ELMT","target_price":42.00,"notes":"Molybdenum manufacturer. Sole US producer. Space infrastructure materials."},
+        {"id":5,"ticker":"PLTR","target_price":110.00,"notes":"Elite fundamentals but priced for perfection. Only add on a real pullback toward $105-115, not while extended."},
     ]
 
 def holdings():
@@ -162,10 +168,11 @@ def compute_signal(ticker,price,avg_cost,change_pct):
     if change_pct<-3: score+=1; reasons.append("Dip opportunity today")
     if pnl<-20: score+=1; reasons.append("Below cost — accumulate zone")
     elif pnl>30: score-=1; reasons.append("Strong gain — consider trim")
-    if ticker=="LLY":  score+=2; reasons.insert(0,"Building to 10-15% target")
+    if ticker=="LLY":  score=max(score,2); reasons.insert(0,"Uncapped core anchor — no allocation ceiling, add on any weakness")
     if ticker=="MSTR": score=-1; reasons=["Exit gradually via mNAV cycle — convert to BTC"]
     if ticker=="AMZN": score=0;  reasons=["Core compounder — hold, margin anchor"]
-    if ticker=="HIMS" and score==0: reasons.append("July FDA peptide catalyst — hold core, trim 400 at $40")
+    if ticker=="HIMS" and score==0: reasons.append("Peptide 503A pathway PCAC-approved (multi-yr rollout); hold core, trim only if $40 confirms as resistance")
+    if ticker=="ASTS": score=0;  reasons=["Small speculative long-duration bet — hold, no aggressive adds without fresh capital"]
     return {"signal":"ADD" if score>=2 else "TRIM" if score<=-2 else "HOLD","score":score,"reasons":reasons}
 
 async def build_snapshot():
@@ -217,7 +224,7 @@ async def ai_analyze_position(ticker):
     if not pos: return f"{ticker} not found."
     hist=await get_historical(ticker); f=pos["fundamentals"]
     def hs(v): return f"{v:+.2f}%" if v is not None else "N/A"
-    prompt=f"""Portfolio advisor for Ricardo Faraudo, Panama City.
+    prompt=f"""Portfolio advisor for Ricardo Faraudo, Panama City. Today's date: {datetime.now().strftime('%A, %B %d, %Y')}.
 Portfolio: ${snap['total_value']:,.0f} | ${snap['net_equity']:,.0f} net equity | LVR {snap['lvr']:.1f}% | BTC ${snap['btc_price']:,.0f}
 {PORTFOLIO_CONTEXT}
 ANALYZING: {ticker} ({pos['type']}) — Account: {pos.get('account','—')}
@@ -237,7 +244,7 @@ async def ai_analyze_portfolio():
     hist_map={snap["positions"][i]["ticker"]:h for i,h in enumerate(hist_list) if not isinstance(h,Exception)}
     def ys(t): v=hist_map.get(t,{}).get("ytd"); return f"{v:+.1f}%" if v is not None else "N/A"
     pos_lines="\n".join([f"{p['ticker']} ({p.get('account','')}) {p['port_pct']:.1f}% | P&L {p['pl_pct']:+.1f}% | YTD {ys(p['ticker'])} | vs BTC {p['vs_btc_pct']:+.1f}% | {p['signal']['signal']}" for p in snap["positions"]])
-    prompt=f"""Portfolio advisor for Ricardo Faraudo, Panama City. BTC price: ${snap['btc_price']:,.0f}
+    prompt=f"""Portfolio advisor for Ricardo Faraudo, Panama City. Today's date: {datetime.now().strftime('%A, %B %d, %Y')}. BTC price: ${snap['btc_price']:,.0f}
 Total: ${snap['total_value']:,.0f} | Net equity: ${snap['net_equity']:,.0f} | LVR: {snap['lvr']:.1f}%
 POSITIONS:\n{pos_lines}\n{PORTFOLIO_CONTEXT}
 6-month strategy: (1) biggest risk (2) biggest opportunity (3) capital priority (4) key catalysts (5) one action this week. Max 400 words."""
@@ -271,7 +278,7 @@ Morning brief:
 2. PORTFOLIO TODAY — what matters
 3. BTC & MSTR — mNAV {mnav:.2f}x, accumulation status
 4. CATALYST WATCH — next 30 days
-5. LLY BUILD STATUS — at {lly_pct:.1f}%, target 10-15%
+5. LLY STATUS — at {lly_pct:.1f}% of portfolio (uncapped core anchor, no target ceiling — do not suggest trimming for balance reasons)
 6. TODAY'S FOCUS — one specific action or watch
 Direct analyst tone. Max 400 words."""
     return await call_claude(prompt,1500)
@@ -281,7 +288,7 @@ async def ai_chat(message,history):
     pos_summary="\n".join([f"{p['ticker']} ({p.get('account','')}): ${p['price']:.2f}, {p['port_pct']:.1f}% portfolio, P&L {p['pl_pct']:+.1f}%, vs BTC {p['vs_btc_pct']:+.1f}%, signal: {p['signal']['signal']}" for p in snap["positions"]])
     btc_p=snap["btc_price"]
     mstr_q=snap["quotes"].get("MSTR",{}); mnav=round(mstr_q.get("price",120)/(219900/100000000*btc_p),3) if btc_p else 0
-    system=f"""You are Ricardo's personal portfolio intelligence assistant. Full portfolio knowledge.
+    system=f"""You are Ricardo's personal portfolio intelligence assistant. Full portfolio knowledge. Today's date: {datetime.now().strftime('%A, %B %d, %Y')}.
 Portfolio: ${snap['total_value']:,.0f} | LVR {snap['lvr']:.1f}% | BTC ${btc_p:,.0f} | MSTR mNAV {mnav:.2f}x
 POSITIONS:\n{pos_summary}\n{PORTFOLIO_CONTEXT}
 Answer questions about portfolio, positions, BTC accumulation strategy, market conditions. Be direct and specific. Under 200 words unless detailed analysis needed."""
@@ -860,6 +867,8 @@ const F = {
   SOFI:{pe:28,ps:2.8,peg:0.8,dilution:"~13%/yr",sector:"Fintech"},
   ZETA:{pe:null,ps:2.5,peg:0.8,dilution:"~3%/yr",sector:"AI Marketing"},
   ELMT:{pe:null,ps:2.2,peg:null,dilution:"~2%/yr",sector:"Space Materials"},
+  ASTS:{pe:null,ps:120,peg:null,dilution:"~8%/yr (convert risk)",sector:"Satellite/Defense"},
+  PLTR:{pe:145,ps:40,peg:null,dilution:"~2%/yr",sector:"Defense/Data Analytics"},
 };
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
