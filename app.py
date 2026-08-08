@@ -703,6 +703,7 @@ tr:hover td{background:rgba(0,212,255,0.025);}
 .sg-t{background:rgba(255,61,87,0.1);color:var(--rd);border:1px solid rgba(255,61,87,0.2);}
 .sg-w{background:rgba(0,212,255,0.1);color:var(--ac);border:1px solid rgba(0,212,255,0.2);}
 .sg-b{background:rgba(247,147,26,0.15);color:var(--btc);border:1px solid rgba(247,147,26,0.3);}
+.sg-ac{background:rgba(0,230,118,0.08);color:#5de89b;border:1px solid rgba(0,230,118,0.2);}
 .ai{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .at{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--ac);min-width:48px;}
 .ab{flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
@@ -1278,8 +1279,8 @@ async function loadAll(opts){
   try{
     const extraTickers = binancePos.map(p=>p.ticker).join(',');
     const quotesUrl = '/quotes' + (extraTickers ? '?extra='+encodeURIComponent(extraTickers) : '');
-    const[h,w,q,st]=await Promise.all([api('GET','/holdings'),api('GET','/watchlist'),api('GET',quotesUrl),api('GET','/status')]);
-    S.h=h; S.w=w; S.q=q;
+    const[h,w,q,st,snap]=await Promise.all([api('GET','/holdings'),api('GET','/watchlist'),api('GET',quotesUrl),api('GET','/status'),api('GET','/snapshot')]);
+    S.h=h; S.w=w; S.q=q; S.snap=snap;
     if(!S.sel&&h.length) S.sel=h[0].ticker;
     // Flag when Yahoo failed and we're serving hardcoded fallback prices
     const vals=Object.values(q||{});
@@ -1342,7 +1343,7 @@ function wr(f){
 }
 const fmt$=n=>"$"+Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:0,maximumFractionDigits:0});
 function fmtP(v,l=false){if(l)return'<span style="color:var(--t3)">...</span>';if(v==null)return'<span style="color:var(--t3)">—</span>';return`<span class="${v>=0?"pos":"neg"}">${v>=0?"+":""}${v.toFixed(2)}%</span>`;}
-function sgc(s){return{ADD:"sg-a",HOLD:"sg-h",TRIM:"sg-t"}[s]||"sg-w";}
+function sgc(s){return{ADD:"sg-a",ACCUMULATE:"sg-ac",HOLD:"sg-h",TRIM:"sg-t"}[s]||"sg-w";}
 function sgi(s){return{ADD:"▲",HOLD:"■",TRIM:"▼"}[s]||"◆";}
 const tog=id=>{const e=document.getElementById(id);e.style.display=e.style.display==="none"?"block":"none";};
 
@@ -1444,18 +1445,31 @@ function renderMargin(){
 }
 
 function renderSigs(){
-  // Consolidate signals by ticker
-  const seen = new Set();
-  const consolidated = S.h.filter(h=>{
-    if(seen.has(h.ticker)) return false;
-    seen.add(h.ticker); return true;
+  // Signals are computed server-side in build_snapshot() and exposed via
+  // /api/snapshot. They are NOT on /api/holdings — reading h.signal there was
+  // always undefined, which is why this panel rendered empty cards.
+  const el=document.getElementById("sigs");
+  const positions=(S.snap&&S.snap.positions)||[];
+  if(!positions.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--t3);padding:8px;">No signals yet — waiting for quote data.</div>';
+    return;
+  }
+  // Consolidate multi-account holdings into one card per ticker
+  const seen=new Set();
+  const consolidated=positions.filter(p=>{
+    if(seen.has(p.ticker)) return false;
+    seen.add(p.ticker); return true;
   });
-  document.getElementById("sigs").innerHTML=consolidated.map(h=>{
-    const sig=h.signal||{signal:"HOLD",reasons:[]};
-    const accounts = [...new Set(S.h.filter(x=>x.ticker===h.ticker).map(x=>x.account||""))].filter(Boolean).join("+");
+  el.innerHTML=consolidated.map(p=>{
+    const sig=p.signal||{signal:"HOLD",reasons:[]};
+    const accounts=[...new Set(positions.filter(x=>x.ticker===p.ticker).map(x=>x.account||""))].filter(Boolean).join("+");
+    const reasons=(sig.reasons||[]);
+    const body=reasons.length
+      ? reasons.map(r=>`• ${r}`).join("<br>")
+      : '<span style="color:var(--t3);">No active triggers</span>';
     return`<div class="pn" style="flex:1;min-width:190px;max-width:260px;">
-      <div class="ph"><div class="pt">${h.ticker} <span style="color:var(--yw);font-size:9px;">${accounts}</span></div><span class="sg ${sgc(sig.signal)}">${sig.signal}</span></div>
-      <div class="pb" style="padding:10px 14px;"><div style="font-size:11px;color:var(--t3);line-height:1.7;">${(sig.reasons||[]).map(r=>`• ${r}`).join("<br>")}</div></div>
+      <div class="ph"><div class="pt">${p.ticker} <span style="color:var(--yw);font-size:9px;">${accounts}</span></div><span class="sg ${sgc(sig.signal)}">${sig.signal}</span></div>
+      <div class="pb" style="padding:10px 14px;"><div style="font-size:11px;color:var(--t3);line-height:1.7;">${body}</div></div>
     </div>`;
   }).join("");
 }
