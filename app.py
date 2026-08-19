@@ -394,29 +394,53 @@ async def build_snapshot():
             "quotes":quotes}
 
 WEB_SEARCH_TOOL=[{"type":"web_search_20250305","name":"web_search","max_uses":5}]
+_web_search_ok=True   # flips False if the API rejects the tool, so we stop sending it
 
 async def call_claude(prompt,max_tokens=1024,web=True):
-    """web=True lets the model look up current news/prices instead of relying on
-    its training data — this is what stops it describing past events as upcoming."""
+    """web=True lets the model look up current news instead of relying on training
+    data. If the API rejects the web-search tool (400), we fall back to a plain
+    request rather than failing outright."""
+    global _web_search_ok
     key=get_anthropic_key()
     if not key: raise ValueError("ANTHROPIC_API_KEY not set in Railway Variables")
-    payload={"model":"claude-sonnet-4-6","max_tokens":max_tokens,
-             "messages":[{"role":"user","content":prompt}]}
-    if web: payload["tools"]=WEB_SEARCH_TOOL
+
+    async def _post(use_tools):
+        payload={"model":"claude-sonnet-4-6","max_tokens":max_tokens,
+                 "messages":[{"role":"user","content":prompt}]}
+        if use_tools: payload["tools"]=WEB_SEARCH_TOOL
+        async with httpx.AsyncClient(timeout=120.0) as c:
+            return await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},json=payload)
+
+    use_tools = web and _web_search_ok
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=120.0) as c:
-                r=await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},json=payload)
-                if r.status_code in (429,500,502,503,529) and attempt<2:
-                    await asyncio.sleep((attempt+1)*5); continue
-                r.raise_for_status()
-                # Response may contain text, server_tool_use and web_search_tool_result
-                # blocks — take only the text the model actually wrote.
-                return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
+            r=await _post(use_tools)
+            if r.status_code in (429,500,502,503,529) and attempt<2:
+                await asyncio.sleep((attempt+1)*5); continue
+            if r.status_code==400:
+                # Surface what the API actually objected to instead of a bare 400.
+                try: detail=r.json().get("error",{}).get("message","")
+                except Exception: detail=r.text[:300]
+                if use_tools:
+                    # Most likely the web-search tool isn't available on this key.
+                    # Disable it for the rest of the process and retry plain.
+                    _web_search_ok=False; use_tools=False
+                    r=await _post(False)
+                    if r.status_code==200:
+                        return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
+                    try: detail=r.json().get("error",{}).get("message",detail)
+                    except Exception: pass
+                raise ValueError(f"Anthropic API rejected the request (400): {detail}")
+            r.raise_for_status()
+            # Response may contain text, server_tool_use and web_search_tool_result
+            # blocks — take only the text the model actually wrote.
+            return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
         except httpx.HTTPStatusError as e:
             if e.response.status_code in (429,500,502,503,529) and attempt<2:
                 await asyncio.sleep((attempt+1)*5); continue
-            raise
+            try: detail=e.response.json().get("error",{}).get("message","")
+            except Exception: detail=e.response.text[:300]
+            raise ValueError(f"Anthropic API error {e.response.status_code}: {detail}")
         except httpx.TimeoutException:
             if attempt<2: await asyncio.sleep(5); continue
             raise ValueError("Request timed out after 3 attempts — try again shortly.")
@@ -503,20 +527,38 @@ Answer questions about portfolio, positions, BTC accumulation strategy, market c
     messages.append({"role":"user","content":message})
     key=get_anthropic_key()
     if not key: raise ValueError("ANTHROPIC_API_KEY not set")
-    payload={"model":"claude-sonnet-4-6","max_tokens":1500,"system":system,
-             "messages":messages,"tools":WEB_SEARCH_TOOL}
+    global _web_search_ok
+    async def _post_chat(use_tools):
+        payload={"model":"claude-sonnet-4-6","max_tokens":1500,"system":system,"messages":messages}
+        if use_tools: payload["tools"]=WEB_SEARCH_TOOL
+        async with httpx.AsyncClient(timeout=120.0) as c:
+            return await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},json=payload)
+
+    use_tools=_web_search_ok
     for attempt in range(3):
         try:
-            async with httpx.AsyncClient(timeout=120.0) as c:
-                r=await c.post(ANTHROPIC_URL,headers={"x-api-key":key,"anthropic-version":"2023-06-01","content-type":"application/json"},json=payload)
-                if r.status_code in (429,500,502,503,529) and attempt<2:
-                    await asyncio.sleep((attempt+1)*5); continue
-                r.raise_for_status()
-                return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
+            r=await _post_chat(use_tools)
+            if r.status_code in (429,500,502,503,529) and attempt<2:
+                await asyncio.sleep((attempt+1)*5); continue
+            if r.status_code==400:
+                try: detail=r.json().get("error",{}).get("message","")
+                except Exception: detail=r.text[:300]
+                if use_tools:
+                    _web_search_ok=False; use_tools=False
+                    r=await _post_chat(False)
+                    if r.status_code==200:
+                        return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
+                    try: detail=r.json().get("error",{}).get("message",detail)
+                    except Exception: pass
+                raise ValueError(f"Anthropic API rejected the request (400): {detail}")
+            r.raise_for_status()
+            return "".join(b.get("text","") for b in r.json().get("content",[]) if b.get("type")=="text")
         except httpx.HTTPStatusError as e:
             if e.response.status_code in (429,500,502,503,529) and attempt<2:
                 await asyncio.sleep((attempt+1)*5); continue
-            raise
+            try: detail=e.response.json().get("error",{}).get("message","")
+            except Exception: detail=e.response.text[:300]
+            raise ValueError(f"Anthropic API error {e.response.status_code}: {detail}")
         except httpx.TimeoutException:
             if attempt<2: await asyncio.sleep(5); continue
             raise ValueError("Request timed out — try again shortly.")
